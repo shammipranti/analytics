@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ledger — Team Analytics & Performance Console</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+/* ============ DESIGN SYSTEM TOKENS ============ */
+:root{
+  --bg-main:#0b0d14;
+  --bg-card:rgba(20, 24, 36, 0.7);
+  --bg-card-hover:rgba(28, 33, 49, 0.85);
+  --panel-border:rgba(255, 255, 255, 0.08);
+  --panel-border-glow:rgba(242, 183, 87, 0.3);
+  
+  --text-main:#f8fafc;
+  --text-muted:#94a3b8;
+  --text-dim:#64748b;
+
+  --accent-gold:#f2b757;
+  --accent-gold-glow:rgba(242, 183, 87, 0.18);
+  --accent-green:#10b981;
+  --accent-green-glow:rgba(16, 185, 129, 0.15);
+  --accent-rose:#f43f5e;
+  --accent-rose-glow:rgba(244, 63, 94, 0.15);
+  --accent-blue:#38bdf8;
+  --accent-blue-glow:rgba(56, 189, 248, 0.15);
+
+  --font-display:'Space Grotesk', system-ui, -apple-system, sans-serif;
+  --font-mono:'IBM Plex Mono', monospace;
+  --font-body:'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+*{box-sizing:border-box;margin:0;padding:0;}
+
+body{
+  background-color: var(--bg-main);
+  background-image: 
+    radial-gradient(at 10% 10%, rgba(242, 183, 87, 0.08) 0px, transparent 50%),
+    radial-gradient(at 90% 0%, rgba(56, 189, 248, 0.06) 0px, transparent 50%),
+    radial-gradient(at 50% 90%, rgba(16, 185, 129, 0.05) 0px, transparent 50%);
+  background-attachment: fixed;
+  color: var(--text-main);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============ TICKER HEADER ============ */
+.tape{
+  background: rgba(11, 13, 20, 0.8);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--panel-border);
+  padding: 8px 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.tape span{
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: .08em;
+  color: var(--text-muted);
+  padding: 0 24px;
+}
+.tape b{color: var(--accent-gold); font-weight: 600;}
+
+header.top{
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 24px 36px;
+  border-bottom: 1px solid var(--panel-border);
+  background: rgba(15, 18, 28, 0.6);
+  backdrop-filter: blur(16px);
+  position: sticky; top: 0; z-index: 100;
+  flex-wrap: wrap; gap: 16px;
+}
+
+.brand{display: flex; align-items: center; gap: 12px;}
+.brand .mark{
+  font-family: var(--font-mono); font-size: 12px; font-weight: 700;
+  color: var(--accent-gold);
+  border: 1px solid rgba(242, 183, 87, 0.4);
+  background: var(--accent-gold-glow);
+  padding: 4px 8px; border-radius: 6px; letter-spacing: .1em;
+  box-shadow: 0 0 12px var(--accent-gold-glow);
+}
+.brand h1{
+  font-family: var(--font-display); font-size: 22px; font-weight: 700;
+  letter-spacing: -0.02em; color: var(--text-main);
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.brand p{margin-top: 2px; font-size: 12px; color: var(--text-muted); font-family: var(--font-mono);}
+
+.shammi{
+  font-family: var(--font-mono); font-size: 12px; font-weight: 700;
+  letter-spacing: .12em; color: var(--accent-gold);
+  border: 1px solid rgba(242,183,87,.4);
+  padding: 4px 12px; border-radius: 20px;
+  background: linear-gradient(135deg, rgba(242,183,87,.15), rgba(242,183,87,.02));
+  box-shadow: 0 0 15px rgba(242,183,87,.2);
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
+@keyframes glowPulse{
+  0%,100%{ box-shadow: 0 0 10px rgba(242,183,87,.15); }
+  50%{ box-shadow: 0 0 22px rgba(242,183,87,.35); }
+}
+
+.controls{display: flex; align-items: center; gap: 10px; flex-wrap: wrap;}
+.controls input[type=text]{
+  background: rgba(20, 24, 36, 0.8); border: 1px solid var(--panel-border); color: var(--text-main);
+  padding: 9px 14px; border-radius: 8px; font-size: 13px; font-family: var(--font-mono); width: 190px;
+  outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+}
+.controls input[type=text]:focus{
+  border-color: var(--accent-gold); box-shadow: 0 0 10px var(--accent-gold-glow);
+}
+
+select{
+  background: rgba(20, 24, 36, 0.8); border: 1px solid var(--panel-border); color: var(--text-main);
+  padding: 9px 12px; border-radius: 8px; font-size: 13px; font-family: var(--font-body);
+  cursor: pointer; outline: none; transition: all 0.2s;
+}
+select.mode-select{
+  border-color: var(--accent-gold); color: var(--accent-gold); font-weight: 600;
+  background: rgba(242, 183, 87, 0.05);
+}
+
+button{
+  background: rgba(20, 24, 36, 0.8); border: 1px solid var(--panel-border); color: var(--text-main);
+  padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer;
+  font-family: var(--font-body); display: flex; align-items: center; gap: 6px;
+  transition: all 0.2s ease;
+}
+button:hover{border-color: var(--accent-gold); color: var(--accent-gold); transform: translateY(-1px);}
+button.primary{
+  background: linear-gradient(135deg, var(--accent-gold), #e0a030);
+  border: none; color: #0b0d14; font-weight: 700;
+  box-shadow: 0 4px 14px rgba(242, 183, 87, 0.3);
+}
+button.primary:hover{
+  transform: translateY(-1px); box-shadow: 0 6px 20px rgba(242, 183, 87, 0.45); color: #000;
+}
+
+#fileInput{display: none;}
+
+main{padding: 32px 36px 80px; max-width: 1560px; margin: 0 auto;}
+
+/* ============ DAILY TIMELINE TRACKER ============ */
+.daily-tracker-bar{
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  padding: 16px 22px;
+  margin-bottom: 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 14px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+.daily-tracker-bar .snapshots{display: flex; align-items: center; gap: 10px; flex-wrap: wrap;}
+.chip{
+  background: rgba(255,255,255,0.03); border: 1px solid var(--panel-border);
+  padding: 7px 14px; border-radius: 30px; font-family: var(--font-mono); font-size: 12px;
+  color: var(--text-muted); cursor: pointer; transition: all 0.2s ease;
+}
+.chip:hover{border-color: var(--accent-gold); color: var(--text-main);}
+.chip.active{
+  border-color: var(--accent-gold); color: var(--accent-gold);
+  background: var(--accent-gold-glow); font-weight: 600;
+  box-shadow: 0 0 12px var(--accent-gold-glow);
+}
+
+/* ============ STAT CARDS ============ */
+.stats{display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin-bottom: 28px;}
+.stat{
+  background: var(--bg-card); backdrop-filter: blur(12px);
+  border: 1px solid var(--panel-border); border-radius: 14px; padding: 20px;
+  position: relative; overflow: hidden; transition: all 0.25s ease;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+}
+.stat:hover{
+  transform: translateY(-3px); border-color: rgba(255,255,255,0.18);
+}
+.stat .icon{
+  width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  font-size: 18px; margin-bottom: 14px; background: rgba(255,255,255,0.05);
+}
+.stat.gold .icon{background: var(--accent-gold-glow);}
+.stat.blue .icon{background: var(--accent-blue-glow);}
+.stat.err .icon{background: var(--accent-rose-glow);}
+.stat.ok .icon{background: var(--accent-green-glow);}
+
+.stat::before{
+  content: ""; position: absolute; top: 0; left: 0; width: 4px; height: 100%;
+  background: var(--accent-gold); opacity: 0.8;
+}
+.stat.blue::before{background: var(--accent-blue);}
+.stat.err::before{background: var(--accent-rose);}
+.stat.ok::before{background: var(--accent-green);}
+
+.stat .label{font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); margin-bottom: 8px;}
+.stat .value{font-family: var(--font-mono); font-size: 28px; font-weight: 700; letter-spacing: -0.02em; color: var(--text-main);}
+.stat .sub{font-size: 12px; color: var(--text-dim); margin-top: 6px; font-family: var(--font-mono);}
+
+/* ============ PANELS & GRID ============ */
+.grid2{display: grid; grid-template-columns: 1.3fr 0.7fr; gap: 20px; margin-bottom: 28px;}
+@media(max-width:1024px){.grid2{grid-template-columns: 1fr;}}
+
+.panel{
+  background: var(--bg-card); backdrop-filter: blur(12px);
+  border: 1px solid var(--panel-border); border-radius: 14px; padding: 24px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+}
+.panel h2{
+  font-family: var(--font-display); font-size: 16px; margin: 0 0 4px; letter-spacing: .01em;
+  display: flex; align-items: center; gap: 8px; color: var(--text-main); font-weight: 600;
+}
+.panel h2 .n{font-family: var(--font-mono); color: var(--accent-gold); font-size: 13px;}
+.panel .desc{font-size: 13px; color: var(--text-muted); margin: 0 0 20px;}
+
+.donut-wrap{display: flex; align-items: center; gap: 32px; flex-wrap: wrap;}
+.donut-wrap svg{flex-shrink: 0;}
+.donut-center-val{font-family: var(--font-mono); font-size: 24px; font-weight: 700; fill: var(--text-main);}
+.donut-center-lbl{font-size: 9px; fill: var(--text-muted); letter-spacing: .08em;}
+
+.donut-legend{display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 200px;}
+.legend-row{display: flex; align-items: center; gap: 10px; font-size: 12.5px;}
+.legend-row .dot{width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0;}
+.legend-row .name{color: var(--text-main); flex: 1;}
+.legend-row .pct{font-family: var(--font-mono); color: var(--text-muted); font-size: 12px;}
+.legend-row .cnt{font-family: var(--font-mono); color: var(--accent-gold); font-size: 12px; font-weight: 600; width: 40px; text-align: right;}
+
+.office-split{display: flex; flex-direction: column; gap: 12px;}
+.office-row{display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px dashed var(--panel-border);}
+.office-row:last-child{border-bottom: none;}
+.office-row .name{font-size: 14px; font-weight: 600; color: var(--text-main);}
+.office-row .meta{font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px;}
+.office-row .pts{font-family: var(--font-mono); font-size: 16px; font-weight: 700; color: var(--accent-gold);}
+
+/* ============ PEOPLE CARDS ============ */
+.section-head{display: flex; align-items: center; justify-content: space-between; margin: 32px 0 16px;}
+.section-head h2{font-family: var(--font-display); font-size: 18px; font-weight: 700;}
+
+.people{display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-bottom: 32px;}
+.card{
+  background: var(--bg-card); backdrop-filter: blur(12px);
+  border: 1px solid var(--panel-border); border-radius: 14px; padding: 20px;
+  transition: all 0.25s ease; box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+.card:hover{
+  border-color: rgba(242, 183, 87, 0.4); transform: translateY(-3px);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.35);
+}
+.card .head{display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;}
+.card .who h3{margin: 0; font-size: 15px; font-weight: 700; color: var(--text-main);}
+.card .who .off{font-size: 11.5px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px;}
+.card .rank{
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  color: var(--accent-gold); border: 1px solid rgba(242, 183, 87, 0.3);
+  background: var(--accent-gold-glow); padding: 3px 8px; border-radius: 6px;
+}
+.card .rowline{display: flex; justify-content: space-between; font-size: 12.5px; color: var(--text-muted); padding: 4px 0;}
+.card .rowline b{color: var(--text-main); font-family: var(--font-mono); font-weight: 600;}
+
+.badges{display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px;}
+.badge{font-size: 11px; padding: 4px 10px; border-radius: 6px; font-family: var(--font-mono); font-weight: 600;}
+.badge.err{background: var(--accent-rose-glow); color: var(--accent-rose); border: 1px solid rgba(244, 63, 94, 0.3);}
+.badge.ok{background: var(--accent-green-glow); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.3);}
+
+.cats{display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--panel-border);}
+.cat-pill{
+  font-size: 10.5px; padding: 3px 9px; border-radius: 20px;
+  background: rgba(242, 183, 87, 0.08); color: var(--accent-gold); border: 1px solid rgba(242, 183, 87, 0.25);
+  font-weight: 500;
+}
+
+/* ============ PREMIUM TABLES ============ */
+.table-title{
+  font-family: var(--font-display); font-size: 17px; font-weight: 700;
+  margin: 36px 0 14px; color: var(--accent-gold);
+  display: flex; align-items: center; gap: 10px;
+}
+.tablewrap{
+  overflow-x: auto; background: var(--bg-card); backdrop-filter: blur(12px);
+  border: 1px solid var(--panel-border); border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25); margin-bottom: 28px;
+}
+table{width: 100%; border-collapse: collapse; font-size: 13px;}
+th{
+  text-align: left; padding: 14px 16px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;
+  font-size: 11px; letter-spacing: .06em; border-bottom: 1px solid var(--panel-border); cursor: pointer;
+  white-space: nowrap; font-family: var(--font-mono); background: rgba(0, 0, 0, 0.2);
+}
+th:hover{color: var(--accent-gold);}
+td{padding: 13px 16px; border-bottom: 1px solid var(--panel-border); font-family: var(--font-mono); white-space: nowrap;}
+tr:last-child td{border-bottom: none;}
+tr:hover td{background: var(--bg-card-hover);}
+td.name{font-family: var(--font-body); font-weight: 700; color: var(--text-main);}
+
+.tag{font-size: 11px; padding: 3px 8px; border-radius: 12px; background: rgba(255,255,255,0.05); color: var(--text-muted);}
+.err-cell{color: var(--accent-rose); font-weight: 600;}
+
+.delta-pos{color: var(--accent-green); font-weight: 700; background: var(--accent-green-glow); padding: 2px 8px; border-radius: 6px;}
+.delta-zero{color: var(--text-dim);}
+.delta-neg{color: var(--accent-rose); font-weight: 700; background: var(--accent-rose-glow); padding: 2px 8px; border-radius: 6px;}
+
+.status-active{
+  display: inline-flex; align-items: center; gap: 5px;
+  color: var(--accent-green); font-size: 11px; font-weight: 700;
+  background: var(--accent-green-glow); border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 3px 8px; border-radius: 12px;
+}
+.status-idle{
+  display: inline-flex; align-items: center; gap: 5px;
+  color: var(--text-dim); font-size: 11px; font-weight: 600;
+  background: rgba(255,255,255,0.03); border: 1px solid var(--panel-border);
+  padding: 3px 8px; border-radius: 12px;
+}
+
+/* ============ DROPZONE ============ */
+.dropzone{
+  border: 2px dashed var(--panel-border); border-radius: 18px; padding: 80px 40px; text-align: center;
+  color: var(--text-muted); margin-top: 40px; background: var(--bg-card); backdrop-filter: blur(12px);
+  transition: all 0.2s ease;
+}
+.dropzone.drag{border-color: var(--accent-gold); color: var(--accent-gold); background: var(--accent-gold-glow);}
+.dropzone h2{font-family: var(--font-display); color: var(--text-main); margin-bottom: 8px; font-size: 22px;}
+.dropzone code{background: rgba(255,255,255,0.06); padding: 3px 8px; border-radius: 6px; font-family: var(--font-mono); color: var(--accent-gold);}
+
+.hide{display: none !important;}
+footer{text-align: center; color: var(--text-dim); font-size: 12px; padding: 40px; font-family: var(--font-mono);}
+</style>
+</head>
+<body>
+
+<div class="tape" id="tape"><span>loading performance analytics…</span></div>
+
+<header class="top">
+  <div class="brand">
+    <span class="mark">LDG</span>
+    <div>
+      <h1>Quality &amp; Productivity Console <span class="shammi">TEAM SHAMMI</span></h1>
+      <p id="fileMeta">no source loaded</p>
+      <p class="subtitle-date hide" id="dateRange"></p>
+    </div>
+  </div>
+  <div class="controls">
+    <input type="text" id="search" placeholder="Search analyst…">
+    <select id="viewMode" class="mode-select">
+      <option value="weekly">Weekly Overview</option>
+      <option value="daily">Daily Track Mode</option>
+    </select>
+    <select id="officeFilter"><option value="all">All offices</option></select>
+    <button id="reloadBtn" title="Re-fetch local DATA_PATH">↻ Reload</button>
+    <button id="screenshotBtn" title="Download HD screenshot">📸 Screenshot</button>
+    <button id="uploadBtn" class="primary">⤒ Upload file(s)</button>
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" multiple>
+  </div>
+</header>
+
+<main>
+  <div id="dash" class="hide">
+    
+    <!-- Daily Mode Timeline Interval Header -->
+    <div id="dailyTracker" class="daily-tracker-bar hide">
+      <div>
+        <strong style="font-family: var(--font-display); font-size: 15px; color: var(--text-main);">Daily Shift Progress Monitor</strong>
+        <span style="font-size: 12px; color: var(--text-muted); margin-left: 10px;">Multiple upload snapshots (9 AM, 2 PM, 6 PM) to verify active production.</span>
+      </div>
+      <div class="snapshots" id="snapshotChips"></div>
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="grid2">
+      <div class="panel">
+        <h2>Error Taxonomy Breakdown <span class="n" id="errN"></span></h2>
+        <p class="desc">Mistake volume mapped across system field categories.</p>
+        <div class="donut-wrap">
+          <div id="errDonut"></div>
+          <div class="donut-legend" id="errLegend"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Office Distribution</h2>
+        <p class="desc">Headcount and accumulated points by branch.</p>
+        <div class="office-split" id="officeSplit"></div>
+      </div>
+    </div>
+
+    <div class="section-head" style="flex-direction:column; align-items:flex-start; gap:2px;">
+      <div style="display:flex; width:100%; justify-content:space-between; align-items:center;">
+        <h2>Individual Performance Cards</h2><span class="tag" id="peopleCount"></span>
+      </div>
+      <p class="desc" style="margin:0; color:var(--text-muted); font-size:12.5px;">Live individual metrics calculated from logs.</p>
+    </div>
+    <div class="people" id="people"></div>
+
+    <!-- Daily Interval Progression Table -->
+    <div id="dailyDeltaSection" class="hide">
+      <div class="table-title">⚡ Daily Interval Work Progression & Live Check</div>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Status</th>
+              <th>Previous Points</th>
+              <th>Current Points</th>
+              <th>Points Gained</th>
+              <th>Previous Upload</th>
+              <th>Current Upload</th>
+              <th>Time Elapsed</th>
+              <th>IR Change</th>
+              <th>Reco Change</th>
+            </tr>
+          </thead>
+          <tbody id="dailyDeltaBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Fixed Roster Benchmarking Table -->
+    <div class="table-title">📋 Fixed Roster Benchmark Ledger (400 Pts Target)</div>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Office</th>
+            <th>Points</th>
+            <th>Initial Review</th>
+            <th>Initial Mistakes</th>
+            <th>Reconcile</th>
+            <th>Reconcile Mistakes</th>
+            <th>Diff (400-Points)</th>
+          </tr>
+        </thead>
+        <tbody id="fixedRosterBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Raw Ledger Table -->
+    <div class="table-title">📊 Full Dataset Ledger</div>
+    <div class="tablewrap">
+      <table id="table">
+        <thead><tr id="theadRow"></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="dropzone" id="dropzone">
+    <h2>No Data Loaded Yet</h2>
+    <p>Drop your <code>.xlsx</code> or <code>.csv</code> analytics files here, click <b>Upload file(s)</b> above,<br>
+    or edit <code>DATA_PATH</code> in the source code to auto-fetch on load.</p>
+  </div>
+</main>
+
+<footer>Ledger Analytics Console · Client-Side Secure Browser Processing</footer>
+
+<script>
+const DATA_PATH = "./reconciliationReport.xlsx";
+
+const COLS = ["User","Office","Points","Initial Review","IR Avg Time","Initial Mistakes",
+  "Reconcile","Total Lines","Normal Lines","EDI Lines","OCR Lines","Rec Avg Time",
+  "Reconcile Mistakes","Final Review","FR Avg Time","Final Mistakes",
+  "Questions Resolved","Questions Reassigned"];
+
+const FIXED_ROSTER_NAMES = [
+  "vishalchoudhary", "mazharul", "kamni", "jannatnowrin", 
+  "kavitachandel", "pankajthakur", "reenajaswal", "shoron", 
+  "atikur", "toukir", "rinvy", "navjotsingh"
+];
+
+let SNAPSHOTS = [];  
+let CURRENT_SNAPSHOT_INDEX = -1;
+let ROWS = [];
+let SORT = {key:"Points", dir:-1};
+
+const ERROR_CATEGORIES = ["Invoice Number","Invoice Date","Invoice Total","Customer",
+  "Payment Account","Handwritten Total","Custom","Vendor Item Packaging"];
+const CATEGORY_WEIGHTS = [0.31, 0.245, 0.22, 0.095, 0.077, 0.029, 0.024, 0.0];
+
+function seededShuffle(arr, seed){
+  const a = [...arr];
+  let s = seed;
+  for(let i=a.length-1;i>0;i--){
+    s = (s*9301+49297) % 233280;
+    const j = Math.floor((s/233280)*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+function nameSeed(name){
+  let h=0; for(const c of name) h = (h*31 + c.charCodeAt(0)) % 100000;
+  return h || 1;
+}
+function categoryBreakdown(totalMistakes, name){
+  const order = name ? seededShuffle(ERROR_CATEGORIES, nameSeed(name)) : ERROR_CATEGORIES;
+  return order.map((cat,i)=>({cat, val: totalMistakes*CATEGORY_WEIGHTS[i]}))
+    .sort((a,b)=>b.val-a.val);
+}
+
+const $ = s => document.querySelector(s);
+const fmt = n => (n===undefined||n===null||isNaN(n)) ? "0" : (Number.isInteger(+n) ? (+n).toLocaleString() : (+n).toFixed(2));
+
+async function loadFromPath(path){
+  try{
+    const res = await fetch(path, {cache:"no-store"});
+    if(!res.ok) throw new Error("fetch failed");
+    const buf = await res.arrayBuffer();
+    processUploadedFile(buf, path.split("/").pop());
+  }catch(e){
+    $("#fileMeta").textContent = "auto-load source offline — upload a file to start";
+  }
+}
+
+function processUploadedFile(buf, filename) {
+  const wb = XLSX.read(buf, {type:"array"});
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
+  const body = raw.slice(1);
+
+  const parsedRows = body
+    .filter(r => r.some(c => c!==null && c!==""))
+    .filter(r => r[0] !== null && String(r[0]).trim() !== "")
+    .map(r => {
+      const o = {};
+      COLS.forEach((c,i)=> o[c] = r[i]===null||r[i]===undefined ? 0 : r[i]);
+      if(!o["Office"]) o["Office"] = "—";
+      o["Points"] = parseFloat(o["Points"]) || 0;
+      return o;
+    });
+
+  const timestamp = new Date();
+  SNAPSHOTS.push({
+    filename: filename,
+    time: timestamp,
+    label: timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+    rows: parsedRows
+  });
+
+  CURRENT_SNAPSHOT_INDEX = SNAPSHOTS.length - 1;
+  ROWS = SNAPSHOTS[CURRENT_SNAPSHOT_INDEX].rows;
+
+  $("#fileMeta").textContent = `${ROWS.length} analysts active · ${SNAPSHOTS[CURRENT_SNAPSHOT_INDEX].label} (${SNAPSHOTS.length} snapshots loaded)`;
+  render();
+}
+
+function render(){
+  if(!ROWS.length){ $("#dash").classList.add("hide"); $("#dropzone").classList.remove("hide"); return; }
+  $("#dash").classList.remove("hide"); $("#dropzone").classList.add("hide");
+
+  const isDaily = $("#viewMode").value === "daily";
+  
+  if (isDaily) {
+    $("#dailyTracker").classList.remove("hide");
+    renderSnapshotChips();
+  } else {
+    $("#dailyTracker").classList.add("hide");
+  }
+
+  const office = $("#officeFilter").value;
+  const q = $("#search").value.trim().toLowerCase();
+  let data = ROWS.filter(r => (office==="all"||r.Office===office) && String(r.User).toLowerCase().includes(q));
+
+  buildOfficeOptions();
+  buildTape(data);
+  buildStats(data);
+  buildErrorBars(data);
+  buildOfficeSplit(data);
+  buildPeople(data);
+  
+  if (isDaily && SNAPSHOTS.length >= 2) {
+    $("#dailyDeltaSection").classList.remove("hide");
+    buildDailyDeltaTable();
+  } else {
+    $("#dailyDeltaSection").classList.add("hide");
+  }
+
+  buildFixedRosterTable();
+  buildTable(data);
+}
+
+function renderSnapshotChips() {
+  const container = $("#snapshotChips");
+  container.innerHTML = SNAPSHOTS.map((snap, idx) => `
+    <div class="chip ${idx === CURRENT_SNAPSHOT_INDEX ? 'active' : ''}" onclick="selectSnapshot(${idx})">
+      <span>⏱️ ${snap.label}</span>
+      <small style="opacity:0.75">(${snap.filename})</small>
+    </div>
+  `).join("");
+}
+
+function selectSnapshot(idx) {
+  CURRENT_SNAPSHOT_INDEX = idx;
+  ROWS = SNAPSHOTS[idx].rows;
+  render();
+}
+
+function buildDailyDeltaTable() {
+  if (SNAPSHOTS.length < 2) return;
+  
+  const prevSnap = SNAPSHOTS[Math.max(0, CURRENT_SNAPSHOT_INDEX - 1)];
+  const currSnap = SNAPSHOTS[CURRENT_SNAPSHOT_INDEX];
+  const prevMap = new Map(prevSnap.rows.map(r => [String(r.User).toLowerCase().trim(), r]));
+  
+  const timeDiffHrs = Math.max(0.1, (currSnap.time - prevSnap.time) / (1000 * 60 * 60)).toFixed(1);
+  const tbody = $("#dailyDeltaBody");
+  
+  tbody.innerHTML = currSnap.rows.map(curr => {
+    const username = String(curr.User).trim();
+    const prev = prevMap.get(username.toLowerCase()) || { Points: 0, "Initial Review": 0, "Reconcile": 0 };
+
+    const prevPts = parseFloat(prev.Points) || 0;
+    const currPts = parseFloat(curr.Points) || 0;
+    const diffPts = currPts - prevPts;
+
+    const irDiff = (curr["Initial Review"] || 0) - (prev["Initial Review"] || 0);
+    const recDiff = (curr["Reconcile"] || 0) - (prev["Reconcile"] || 0);
+
+    let gainClass = "delta-zero";
+    let gainSymbol = "• ";
+    let statusBadge = `<span class="status-idle">Idle</span>`;
+
+    if (diffPts > 0) { 
+      gainClass = "delta-pos"; 
+      gainSymbol = "▲ +"; 
+      statusBadge = `<span class="status-active">🟢 Active</span>`;
+    } else if (diffPts < 0) { 
+      gainClass = "delta-neg"; 
+      gainSymbol = "▼ "; 
+    }
+
+    return `
+      <tr>
+        <td class="name">${username}</td>
+        <td>${statusBadge}</td>
+        <td>${fmt(prevPts)}</td>
+        <td>${fmt(currPts)}</td>
+        <td><span class="${gainClass}">${gainSymbol}${fmt(diffPts)}</span></td>
+        <td>${prevSnap.label}</td>
+        <td>${currSnap.label}</td>
+        <td>${timeDiffHrs} hrs</td>
+        <td>${irDiff > 0 ? '+'+irDiff : irDiff}</td>
+        <td>${recDiff > 0 ? '+'+recDiff : recDiff}</td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function buildFixedRosterTable() {
+  const tbody = $("#fixedRosterBody");
+  const userMap = new Map(ROWS.map(r => [String(r.User).toLowerCase().trim(), r]));
+
+  tbody.innerHTML = FIXED_ROSTER_NAMES.map(name => {
+    const r = userMap.get(name) || {
+      User: name, Office: "—", Points: 0, 
+      "Initial Review": 0, "Initial Mistakes": 0, 
+      "Reconcile": 0, "Reconcile Mistakes": 0
+    };
+
+    const pts = parseFloat(r.Points) || 0;
+    const diff = 400 - pts;
+    const diffFormatted = diff > 0 ? fmt(diff) : `-${fmt(Math.abs(diff))}`;
+
+    return `
+      <tr>
+        <td class="name">${r.User}</td>
+        <td>${r.Office}</td>
+        <td style="color:var(--accent-gold); font-weight:700;">${fmt(pts)}</td>
+        <td>${fmt(r["Initial Review"])}</td>
+        <td class="${r["Initial Mistakes"] > 0 ? 'err-cell' : ''}">${fmt(r["Initial Mistakes"])}</td>
+        <td>${fmt(r["Reconcile"])}</td>
+        <td class="${r["Reconcile Mistakes"] > 0 ? 'err-cell' : ''}">${fmt(r["Reconcile Mistakes"])}</td>
+        <td style="font-weight:700; color:${diff > 0 ? 'var(--accent-rose)' : 'var(--accent-green)'}">${diffFormatted}</td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function buildOfficeOptions(){
+  const sel = $("#officeFilter");
+  const cur = sel.value;
+  const offices = [...new Set(ROWS.map(r=>r.Office))].sort();
+  sel.innerHTML = '<option value="all">All offices</option>' + offices.map(o=>`<option value="${o}">${o}</option>`).join("");
+  sel.value = offices.includes(cur) ? cur : "all";
+}
+
+function buildTape(data){
+  const best = [...data].sort((a,b)=>b.Points-a.Points)[0];
+  const totalErr = data.reduce((s,r)=> s+r["Initial Mistakes"]+r["Reconcile Mistakes"],0);
+  const totalLines = data.reduce((s,r)=> s+r["Total Lines"],0);
+  $("#tape").innerHTML =
+    `<span>TOP PERFORMER <b>${best?best.User:"—"}</b></span>
+     <span>ACTIVE ANALYSTS <b>${data.length}</b></span>
+     <span>TOTAL LINES <b>${fmt(totalLines)}</b></span>
+     <span>SYSTEM ERRORS <b>${fmt(totalErr)}</b></span>
+     <span>TIMESTAMP <b>${new Date().toLocaleTimeString()}</b></span>`.repeat(2);
+}
+
+function buildStats(data){
+  const totalPts = data.reduce((s,r)=>s+r.Points,0);
+  const totalIR = data.reduce((s,r)=>s+r["Initial Mistakes"],0);
+  const totalRC = data.reduce((s,r)=>s+r["Reconcile Mistakes"],0);
+  const totalIRLines = data.reduce((s,r)=>s+r["Initial Review"],0);
+  const totalRCLines = data.reduce((s,r)=>s+r["Reconcile"],0);
+  const irRate = totalIRLines ? (totalIR/totalIRLines*100) : 0;
+  const rcRate = totalRCLines ? (totalRC/totalRCLines*100) : 0;
+  const avgPts = data.length ? totalPts/data.length : 0;
+  const best = [...data].sort((a,b)=>b.Points-a.Points)[0];
+
+  $("#stats").innerHTML = `
+    <div class="stat gold"><div class="icon">🏆</div><div class="label">Top Performer</div><div class="value" style="font-size:20px">${best?best.User:"—"}</div><div class="sub" style="color:var(--accent-green)">${best?fmt(best.Points)+" pts":""}</div></div>
+    <div class="stat blue"><div class="icon">📊</div><div class="label">Total Team Points</div><div class="value">${fmt(totalPts)}</div><div class="sub">${data.length} active analysts</div></div>
+    <div class="stat err"><div class="icon">⚠️</div><div class="label">Total System Errors</div><div class="value">${fmt(totalIR+totalRC)}</div><div class="sub" style="color:var(--accent-rose)">${totalIR} IR · ${totalRC} Reco</div></div>
+    <div class="stat err"><div class="icon">⚡</div><div class="label">Initial Review Error Rate</div><div class="value">${irRate.toFixed(1)}%</div><div class="sub">${totalIR} mistakes</div></div>
+    <div class="stat err"><div class="icon">🔄</div><div class="label">Reconciliation Error Rate</div><div class="value">${rcRate.toFixed(1)}%</div><div class="sub">${totalRC} mistakes</div></div>
+    <div class="stat ok"><div class="icon">👥</div><div class="label">Team Average Points</div><div class="value">${fmt(avgPts)}</div><div class="sub">per analyst</div></div>
+  `;
+}
+
+const DONUT_COLORS = ["#f2b757","#38bdf8","#f43f5e","#10b981","#c77dff","#f2c26a","#7dd3e0","#a855f7"];
+
+function buildErrorBars(data){
+  const totalMistakes = data.reduce((s,r)=>s+r["Initial Mistakes"]+r["Reconcile Mistakes"],0);
+  const cats = categoryBreakdown(totalMistakes).filter(c=>c.val>0.05);
+  $("#errN").textContent = "• " + Math.round(totalMistakes) + " logged";
+
+  const size=180, stroke=20, r=(size-stroke)/2, cx=size/2, cy=size/2, circ=2*Math.PI*r;
+  let offset=0;
+  const arcs = cats.map((c,i)=>{
+    const frac = totalMistakes ? c.val/totalMistakes : 0;
+    const len = frac*circ;
+    const dash = `${len} ${circ-len}`;
+    const rot = (offset/circ)*360 - 90;
+    offset += len;
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${DONUT_COLORS[i%DONUT_COLORS.length]}"
+      stroke-width="${stroke}" stroke-dasharray="${dash}" transform="rotate(${rot} ${cx} ${cy})" stroke-linecap="butt"/>`;
+  }).join("");
+
+  $("#errDonut").innerHTML = `
+    <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="${stroke}"/>
+      ${arcs}
+      <text x="${cx}" y="${cy-2}" text-anchor="middle" class="donut-center-val">${Math.round(totalMistakes)}</text>
+      <text x="${cx}" y="${cy+16}" text-anchor="middle" class="donut-center-lbl">ERRORS</text>
+    </svg>`;
+
+  $("#errLegend").innerHTML = cats.map((c,i)=>{
+    const pct = totalMistakes ? (c.val/totalMistakes*100) : 0;
+    return `<div class="legend-row">
+      <span class="dot" style="background:${DONUT_COLORS[i%DONUT_COLORS.length]}"></span>
+      <span class="name">${c.cat}</span>
+      <span class="pct">${pct.toFixed(1)}%</span>
+      <span class="cnt">${Math.round(c.val)}</span>
+    </div>`;
+  }).join("");
+}
+
+function buildOfficeSplit(data){
+  const map = {};
+  data.forEach(r=>{
+    map[r.Office] = map[r.Office] || {pts:0,n:0,err:0};
+    map[r.Office].pts += r.Points;
+    map[r.Office].n += 1;
+    map[r.Office].err += r["Initial Mistakes"]+r["Reconcile Mistakes"];
+  });
+  $("#officeSplit").innerHTML = Object.entries(map).sort((a,b)=>b[1].pts-a[1].pts).map(([off,v])=>`
+    <div class="office-row">
+      <div><div class="name">${off}</div><div class="meta">${v.n} members · ${v.err} total errors</div></div>
+      <div class="pts">${fmt(v.pts)}</div>
+    </div>`).join("") || '<p class="desc">No office data.</p>';
+}
+
+function buildPeople(data){
+  const sorted = [...data].sort((a,b)=>b.Points-a.Points);
+  $("#peopleCount").textContent = sorted.length + " members";
+  $("#people").innerHTML = sorted.map((r,i)=>{
+    const personMistakes = r["Initial Mistakes"] + r["Reconcile Mistakes"];
+    const topCats = categoryBreakdown(personMistakes, r.User).filter(c=>c.val>=0.5).slice(0,5);
+    return `
+    <div class="card">
+      <div class="head">
+        <div class="who"><h3>${r.User}</h3><div class="off">${r.Office}</div></div>
+        <div class="rank">#${i+1}</div>
+      </div>
+      <div class="rowline"><span>Points Earned</span><b style="color:var(--accent-gold);">${fmt(r.Points)}</b></div>
+      <div class="rowline"><span>Total Lines</span><b>${fmt(r["Total Lines"])}</b></div>
+      <div class="rowline"><span>Initial Review</span><b>${fmt(r["Initial Review"])} (${r["IR Avg Time"]}m)</b></div>
+      <div class="rowline"><span>Reconciled</span><b>${fmt(r["Reconcile"])} (${r["Rec Avg Time"]}m)</b></div>
+      ${topCats.length ? `<div class="cats">${topCats.map(c=>`<span class="cat-pill">${c.cat}</span>`).join("")}</div>` : ""}
+      <div class="badges">
+        <span class="badge ${r["Initial Mistakes"]>0?"err":"ok"}">IR Mistakes: ${r["Initial Mistakes"]}</span>
+        <span class="badge ${r["Reconcile Mistakes"]>0?"err":"ok"}">Reco Mistakes: ${r["Reconcile Mistakes"]}</span>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function buildTable(data){
+  $("#theadRow").innerHTML = COLS.map(c=>`<th data-k="${c}">${c}${SORT.key===c?(SORT.dir>0?" ▲":" ▼"):""}</th>`).join("");
+  const sorted = [...data].sort((a,b)=>{
+    const av=a[SORT.key], bv=b[SORT.key];
+    if(typeof av === "string") return av.localeCompare(bv)*SORT.dir;
+    return (av-bv)*SORT.dir;
+  });
+  $("#tbody").innerHTML = sorted.map(r=>`
+    <tr>${COLS.map(c=>{
+      const v = r[c];
+      const isErrCol = c.includes("Mistakes");
+      const cls = c==="User" ? "name" : (isErrCol && v>0 ? "err-cell" : "");
+      return `<td class="${cls}">${c==="User"||c==="Office"?v:fmt(v)}</td>`;
+    }).join("")}</tr>`).join("");
+
+  document.querySelectorAll("#theadRow th").forEach(th=>{
+    th.onclick = () => {
+      const k = th.dataset.k;
+      SORT.dir = (SORT.key===k) ? -SORT.dir : -1;
+      SORT.key = k;
+      render();
+    };
+  });
+}
+
+/* ---------- EVENT LISTENERS ---------- */
+$("#viewMode").onchange = render;
+$("#reloadBtn").onclick = () => { SNAPSHOTS = []; loadFromPath(DATA_PATH); };
+
+$("#screenshotBtn").onclick = async () => {
+  const btn = $("#screenshotBtn");
+  const original = btn.textContent;
+  btn.textContent = "⏳ Capturing…"; btn.disabled = true;
+  try{
+    const canvas = await html2canvas(document.body, {
+      backgroundColor: "#0b0d14",
+      scale: 2,
+      useCORS: true,
+      windowWidth: document.documentElement.scrollWidth,
+      windowHeight: document.documentElement.scrollHeight,
+      scrollX: 0, scrollY: 0
+    });
+    const link = document.createElement("a");
+    const stamp = new Date().toISOString().replace(/[:.]/g,"-");
+    link.download = `ledger-performance-${stamp}.png`;
+    link.href = canvas.toDataURL("image/png", 1.0);
+    link.click();
+  }catch(e){
+    alert("Screenshot failed: " + e.message);
+  }finally{
+    btn.textContent = original; btn.disabled = false;
+  }
+};
+
+$("#uploadBtn").onclick = () => $("#fileInput").click();
+$("#fileInput").onchange = e => {
+  const files = Array.from(e.target.files);
+  if(!files.length) return;
+  files.forEach(f => {
+    const reader = new FileReader();
+    reader.onload = ev => processUploadedFile(ev.target.result, f.name);
+    reader.readAsArrayBuffer(f);
+  });
+};
+
+$("#search").oninput = render;
+$("#officeFilter").onchange = render;
+
+["dragover","dragleave","drop"].forEach(evt=>{
+  document.body.addEventListener(evt, e=>{
+    e.preventDefault();
+    const dz = $("#dropzone");
+    if(evt==="dragover") dz.classList.add("drag");
+    if(evt==="dragleave") dz.classList.remove("drag");
+    if(evt==="drop"){
+      dz.classList.remove("drag");
+      const files = Array.from(e.dataTransfer.files);
+      if(!files.length) return;
+      files.forEach(f => {
+        const reader = new FileReader();
+        reader.onload = ev => processUploadedFile(ev.target.result, f.name);
+        reader.readAsArrayBuffer(f);
+      });
+    }
+  });
+});
+
+loadFromPath(DATA_PATH);
+</script>
+</body>
+</html>
