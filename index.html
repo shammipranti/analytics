@@ -332,7 +332,7 @@ tr:last-child td{border-bottom: none;}
 tr:hover td{background: var(--bg-card-hover);}
 td.name{font-family: var(--font-body); font-weight: 700; color: var(--text-main);}
 
-/* FIXED ROSTER TABLE SPECIFIC STYLES (ENHANCED VISIBILITY & LARGER FONTS) */
+/* FIXED ROSTER TABLE SPECIFIC STYLES */
 .fixed-roster-table th {
   background: rgba(242, 183, 87, 0.12);
   color: var(--accent-gold);
@@ -449,7 +449,7 @@ footer{text-align: center; color: var(--text-dim); font-size: 12px; padding: 40p
     </div>
     <div class="people" id="people"></div>
 
-    <!-- Daily Interval Progression Table -->
+    <!-- Daily Interval Progression Table (Restored to show all analysts) -->
     <div id="dailyDeltaSection" class="hide">
       <div class="table-title">⚡ Daily Interval Work Progression & Live Check</div>
       <div class="tablewrap">
@@ -473,7 +473,7 @@ footer{text-align: center; color: var(--text-dim); font-size: 12px; padding: 40p
       </div>
     </div>
 
-    <!-- Fixed Roster Benchmarking Table with Glowing High-Visibility Header -->
+    <!-- Fixed Roster Benchmarking Table (EXCLUSIVELY for the 16 Internal Team Members) -->
     <div class="table-title-highlight">
       <div class="title-text">
         <span>📋</span>
@@ -481,7 +481,7 @@ footer{text-align: center; color: var(--text-dim); font-size: 12px; padding: 40p
       </div>
       <div style="display: flex; gap: 8px; align-items: center;">
         <span class="tag" style="background: rgba(242, 183, 87, 0.25); color: var(--accent-gold); border: 1px solid rgba(242, 183, 87, 0.5); font-size: 12px; padding: 4px 10px; font-weight: 700;" id="rosterTotalMembersBadge">16 Members</span>
-        <span class="tag" style="background: rgba(56, 189, 248, 0.2); color: var(--accent-blue); border: 1px solid rgba(56, 189, 248, 0.4); font-size: 12px; padding: 4px 10px; font-weight: 700;">Internal Track</span>
+        <span class="tag" style="background: rgba(56, 189, 248, 0.2); color: var(--accent-blue); border: 1px solid rgba(56, 189, 248, 0.4); font-size: 12px; padding: 4px 10px; font-weight: 700;">Internal Roster</span>
       </div>
     </div>
     <div class="tablewrap">
@@ -529,7 +529,7 @@ const COLS = ["User","Office","Points","Initial Review","IR Avg Time","Initial M
   "Reconcile Mistakes","Final Review","FR Avg Time","Final Mistakes",
   "Questions Resolved","Questions Reassigned"];
 
-// Explicit list of requested Internal Team names
+// Explicit list reserved EXCLUSIVELY for the Internal Fixed Roster Ledger
 const INTERNAL_TEAM_NAMES = [
   "atikur", "toukir", "mazharul", "rinvy", "shoron", "jannatnowrin", 
   "disha", "habibullah", "sumaia", "moshiur", "nayelah", "ishrat", 
@@ -618,7 +618,7 @@ function render(){
   const mode = $("#viewMode").value;
   const isDaily = mode === "daily";
   const isInternal = mode === "internal";
-  
+
   if (isDaily || isInternal) {
     $("#dailyTracker").classList.remove("hide");
     renderSnapshotChips();
@@ -629,9 +629,11 @@ function render(){
   const office = $("#officeFilter").value;
   const q = $("#search").value.trim().toLowerCase();
   
+  // Base Data Filter
   let data = ROWS.filter(r => (office==="all"||r.Office===office) && String(r.User).toLowerCase().includes(q));
 
-  if (isDaily || isInternal) {
+  // Only filter main view if explicit Internal Team Mode is selected
+  if (isInternal) {
     data = data.filter(r => INTERNAL_TEAM_NAMES.includes(String(r.User).toLowerCase().trim()));
   }
 
@@ -642,7 +644,7 @@ function render(){
   buildOfficeSplit(data);
   buildPeople(data);
   
-  if ((isDaily || isInternal) && SNAPSHOTS.length >= 2) {
+  if (isDaily && SNAPSHOTS.length >= 2) {
     $("#dailyDeltaSection").classList.remove("hide");
     buildDailyDeltaTable();
   } else {
@@ -669,6 +671,7 @@ function selectSnapshot(idx) {
   render();
 }
 
+/* Daily Delta Interval Progress (Includes ALL members from daily uploads) */
 function buildDailyDeltaTable() {
   if (SNAPSHOTS.length < 2) return;
   
@@ -679,13 +682,7 @@ function buildDailyDeltaTable() {
   const timeDiffHrs = Math.max(0.1, (currSnap.time - prevSnap.time) / (1000 * 60 * 60)).toFixed(1);
   const tbody = $("#dailyDeltaBody");
   
-  let rowsToRender = currSnap.rows;
-  const mode = $("#viewMode").value;
-  if (mode === "daily" || mode === "internal") {
-    rowsToRender = rowsToRender.filter(r => INTERNAL_TEAM_NAMES.includes(String(r.User).toLowerCase().trim()));
-  }
-
-  tbody.innerHTML = rowsToRender.map(curr => {
+  tbody.innerHTML = currSnap.rows.map(curr => {
     const username = String(curr.User).trim();
     const prev = prevMap.get(username.toLowerCase()) || { Points: 0, "Initial Review": 0, "Reconcile": 0 };
 
@@ -726,6 +723,7 @@ function buildDailyDeltaTable() {
   }).join("");
 }
 
+/* Fixed Benchmark Ledger (STRICTLY for the 16 internal team members) */
 function buildFixedRosterTable() {
   const tbody = $("#fixedRosterBody");
   const userMap = new Map(ROWS.map(r => [String(r.User).toLowerCase().trim(), r]));
